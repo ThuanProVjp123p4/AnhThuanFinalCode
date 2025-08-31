@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phần mềm tính tiền gỗ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #334155;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 900px;
+            width: 100%;
+            padding: 2.5rem;
+        }
+        label {
+            font-weight: 500;
+        }
+        .input-field {
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: all 0.2s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        .btn-primary {
+            background-color: #6366f1;
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #4f46e5;
+        }
+        .btn-primary:disabled {
+            background-color: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .invoice-table th, .invoice-table td {
+            padding: 0.2rem 0.1rem;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        .invoice-table th {
+            font-weight: 600;
+            background-color: #f8fafc;
+        }
+        .invoice-table .text-right {
+            text-align: right;
+        }
+        .invoice-table .text-left {
+            text-align: left;
+        }
+        .invoice-table .text-center {
+            text-align: center;
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        .company-info {
+            text-align: left;
+        }
+        .invoice-title {
+            text-align: right;
+        }
+        .invoice-total {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+        }
+        .subtotal-row {
+            font-weight: bold;
+            background-color: #eef2ff; /* Light indigo background for subtotals */
+        }
+        .invoice-table tbody tr.selectable-row:hover {
+             background-color: #f0f4f8;
+             cursor: pointer;
+        }
+        .invoice-table tbody tr.selected {
+             background-color: #dbeafe; /* A slightly darker blue for selection */
+             color: #1e3a8a;
+        }
+        .invoice-table.is-dragging,
+        .invoice-table.is-dragging * {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        /* CSS cho in ấn để in toàn bộ nội dung */
+        @media print {
+            body {
+                background: none;
+                font-size: 8pt;
+                color: black;
+                margin: 0;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            .controls, .no-print {
+                display: none !important;
+            }
+            .invoice-table {
+                width: 100% !important;
+                border-collapse: collapse;
+            }
+            .invoice-table th, .invoice-table td {
+                border-color: #e2e8f0 !important;
+                padding: 0.1rem;
+            }
+            #invoice-wrapper-screen {
+                overflow: visible !important;
+                height: auto !important;
+            }
+            .invoice-table thead {
+                display: table-header-group;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+
+<div class="container mx-auto p-8 bg-white rounded-xl shadow-lg">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Phần nhập liệu -->
+        <div class="space-y-6 controls no-print">
+            <h2 class="text-2xl font-semibold text-gray-800">Thông tin sản phẩm</h2>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="customerName" class="block text-sm font-medium text-gray-700">Tên khách hàng</label>
+                    <input type="text" id="customerName" class="input-field mt-1" placeholder="Nhập tên khách hàng">
+                </div>
+                <div>
+                    <label for="customerPhone" class="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                    <input type="text" id="customerPhone" class="input-field mt-1" placeholder="Nhập số điện thoại">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Dịch vụ chà nhám</label>
+                <div class="flex items-center space-x-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="sandingOption" value="none" checked class="form-radio text-indigo-600">
+                        <span class="ml-2 text-sm text-gray-700">Không chà nhám</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="sandingOption" value="one-side" class="form-radio text-indigo-600">
+                        <span class="ml-2 text-sm text-gray-700">1 mặt (12k/m²)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="sandingOption" value="two-sides" class="form-radio text-indigo-600">
+                        <span class="ml-2 text-sm text-gray-700">2 mặt (24k/m²)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
+                <div class="flex items-center gap-2 mt-1">
+                    <select id="woodType" class="input-field">
+                        <option value="soi">Gỗ Sồi</option>
+                        <option value="lim">Gỗ Lim</option>
+                        <option value="thong">Gỗ Thông</option>
+                        <option value="ash">Gỗ Ash</option>
+                        <option value="xoan">Gần Xoan</option>
+                        <option value="add_new">Thêm loại gỗ mới</option>
+                    </select>
+                    <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="dày" class="block text-sm font-medium text-gray-700">Dày (mm)</label>
+                    <input type="number" id="dày" class="input-field mt-1" placeholder="Dày" step="0.01">
+                </div>
+                <div>
+                    <label for="giá" class="block text-sm font-medium text-gray-700">Giá (VND/m³)</label>
+                    <input type="text" id="giá" class="input-field mt-1" placeholder="Giá" inputmode="numeric">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="rộng" class="block text-sm font-medium text-gray-700">Rộng (cm)</label>
+                    <input type="number" id="rộng" class="input-field mt-1" placeholder="Rộng" step="0.01">
+                </div>
+                <div>
+                    <label for="dài" class="block text-sm font-medium text-gray-700">Dài (x10 cm)</label>
+                    <input type="number" id="dài" class="input-field mt-1" placeholder="Dài" step="0.01">
+                </div>
+            </div>
+            
+            <div class="flex space-x-2 mt-4">
+                <button id="addItemBtn" onclick="addItem()" class="btn-primary w-full">Thêm vào hóa đơn</button>
+            </div>
+            
+            <div class="flex space-x-2 mt-2">
+                <button onclick="splitInvoice()" class="btn-primary w-1/2 bg-blue-500 hover:bg-blue-600">Tách mục đã chọn</button>
+                <button onclick="deleteSelectedSplits()" class="btn-primary w-1/2 bg-yellow-500 hover:bg-yellow-600 text-gray-800">Xóa tách đã chọn</button>
+            </div>
+        </div>
+
+        <!-- Phần hóa đơn -->
+        <div>
+            <div class="invoice-header">
+                <div class="company-info">
+                    <h2 class="font-bold text-lg leading-tight">GỖ NGỌC CHÂU</h2>
+                    <p class="text-sm">Địa chỉ: Số 6 Khang Linh, P.10, TP. Vũng Tàu</p>
+                    <p class="text-sm">Điện thoại: 0912 053 539 - 033 270 1236</p>
+                    <p class="text-sm">Mã số thuế: 8199744282</p>
+                </div>
+                <div class="invoice-title">
+                    <h2 class="font-bold text-xl leading-tight text-center">HÓA ĐƠN BÁN LẺ</h2>
+                    <p class="text-sm text-center" id="invoice-meta">Số: 001 - Ngày: 31/08/2025</p>
+                </div>
+            </div>
+            <div class="customer-info mb-2">
+                <p class="text-sm"><span class="font-semibold">Khách hàng:</span> <span id="customer-name-display"></span></p>
+                <p class="text-sm"><span class="font-semibold">Điện thoại:</span> <span id="customer-phone-display"></span></p>
+            </div>
+            
+            <!-- Vùng chứa có thể cuộn trên màn hình -->
+            <div id="invoice-wrapper-screen" class="bg-gray-50 rounded-lg p-2 overflow-y-auto h-[60vh]">
+                <table id="invoice-table" class="w-full invoice-table text-sm">
+                    <thead>
+                        <tr>
+                            <th class="w-[6%] text-center px-4">STT</th>
+                            <th class="w-[20%] text-center px-4">Loại gỗ</th>
+                            <th class="w-[8%] text-center">Rộng</th>
+                            <th class="w-[8%] text-center">Dài</th>
+                            <th class="w-[18%] text-center">Dày & Giá</th>
+                            <th class="w-[18%] text-center">Chà nhám</th>
+                            <th class="w-[18%] text-center">Tiền gỗ</th>
+                            <th class="w-[4%] text-center no-print"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoice-items">
+                        <!-- Các mục hóa đơn sẽ được thêm vào đây -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-2 pt-2 border-t border-gray-300">
+                <div class="flex justify-between items-center text-md font-semibold text-gray-700">
+                    <span>Tổng tiền chà nhám:</span>
+                    <span id="total-sanding-price">0 đ</span>
+                </div>
+                <div class="flex justify-between items-center text-lg font-bold mt-1">
+                    <span>Tổng cộng hóa đơn:</span>
+                    <span id="total-price">0 đ</span>
+                </div>
+            </div>
+            <div class="mt-4 text-right">
+                <p class="font-semibold mb-2">Người bán</p>
+                <div class="h-20 w-40 inline-block border-b border-gray-400"></div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200 text-sm">
+                <p class="font-semibold mb-1">Phương thức thanh toán:</p>
+                <p>Ngân hàng ACB - Đỗ Ngọc Vũ - 7352437</p>
+                <p>Ngân hàng Vietcombank - Đỗ Ngọc Vũ - 0081001135640</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 mt-4 controls no-print">
+                 <button onclick="undoSplit()" id="undoBtn" class="btn-primary w-full sm:w-1/2 bg-gray-500 hover:bg-gray-600" disabled>Hoàn tác</button>
+                 <button onclick="clearInvoice()" class="btn-primary w-full sm:w-1/2 bg-red-500 hover:bg-red-600">Xóa hóa đơn</button>
+            </div>
+             <div class="flex flex-col sm:flex-row gap-4 mt-2 controls no-print">
+                <button onclick="saveInvoice()" class="btn-primary w-full bg-green-500 hover:bg-green-600">Lưu PDF / In Hóa Đơn</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal để thêm loại gỗ mới -->
+<div id="addWoodModal" class="modal hidden no-print">
+    <div class="modal-content">
+        <h3 class="text-lg font-semibold mb-4">Thêm loại gỗ mới</h3>
+        <div class="space-y-4">
+            <div>
+                <label for="newWoodName" class="block text-sm font-medium text-gray-700">Tên loại gỗ</label>
+                <input type="text" id="newWoodName" class="input-field mt-1" placeholder="Ví dụ: Gỗ Óc chó">
+            </div>
+            <div>
+                <label for="newWoodDày" class="block text-sm font-medium text-gray-700">Dày (mm)</label>
+                <input type="number" id="newWoodDày" class="input-field mt-1" placeholder="Ví dụ: 25">
+            </div>
+            <div>
+                <label for="newWoodGiá" class="block text-sm font-medium text-gray-700">Giá (VND/m³)</label>
+                <input type="number" id="newWoodGiá" class="input-field mt-1" placeholder="Ví dụ: 18000000">
+            </div>
+        </div>
+        <div class="flex justify-end space-x-4 mt-6">
+            <button onclick="closeAddWoodModal()" class="btn-primary bg-gray-500 hover:bg-gray-600">Hủy</button>
+            <button onclick="saveNewWoodType()" class="btn-primary">Lưu</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal chung cho thông báo và xác nhận -->
+<div id="commonModal" class="modal hidden no-print">
+    <div class="modal-content">
+        <h3 id="modalTitle" class="text-lg font-semibold mb-4"></h3>
+        <p id="modalMessage" class="mb-6"></p>
+        <div id="modalButtons" class="flex justify-end space-x-4">
+            <!-- Buttons will be injected here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const woodData = {
+        soi: { dày: null, giá: null, name: "Gỗ Sồi" },
+        lim: { dày: null, giá: null, name: "Gỗ Lim" },
+        thong: { dày: null, giá: null, name: "Gỗ Thông" },
+        ash: { dày: null, giá: null, name: "Gỗ Ash" },
+        xoan: { dày: null, giá: null, name: "Gần Xoan" }
+    };
+
+    const sandingPrices = {
+        none: 0,
+        'one-side': 12000,
+        'two-sides': 24000
+    };
+
+    const woodTypeSelect = document.getElementById('woodType');
+    const rộngInput = document.getElementById('rộng');
+    const dàiInput = document.getElementById('dài');
+    const dàyInput = document.getElementById('dày');
+    const giáInput = document.getElementById('giá');
+    const customerNameInput = document.getElementById('customerName');
+    const customerPhoneInput = document.getElementById('customerPhone');
+    const addWoodModal = document.getElementById('addWoodModal');
+    const newWoodNameInput = document.getElementById('newWoodName');
+    const newWoodDàyInput = document.getElementById('newWoodDày');
+    const newWoodGiáInput = document.getElementById('newWoodGiá');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const undoBtn = document.getElementById('undoBtn');
+
+    const commonModal = document.getElementById('commonModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const modalButtons = document.getElementById('modalButtons');
+    
+    const invoiceScrollDiv = document.getElementById('invoice-wrapper-screen');
+
+    const invoiceTable = document.getElementById('invoice-table');
+    const invoiceItems = document.getElementById('invoice-items');
+    const totalPriceSpan = document.getElementById('total-price');
+    const customerNameDisplay = document.getElementById('customer-name-display');
+    const customerPhoneDisplay = document.getElementById('customer-phone-display');
+    const invoiceMeta = document.getElementById('invoice-meta');
+
+    let invoiceItemsList = [];
+    let invoiceHistory = [];
+    let invoiceNumber = 1;
+    let selectedIndices = new Set();
+    let lastClickedIndex = -1;
+    let isDragging = false;
+    let dragStartIndex = -1;
+    let originalDocumentTitle = document.title;
+
+
+    // --- HELPERS ---
+    function formatNumber(n) {
+        if (isNaN(n) || n === null) return '';
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+
+    function showModal(title, message, buttons) {
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        modalButtons.innerHTML = '';
+        buttons.forEach(btn => {
+            const buttonElement = document.createElement('button');
+            buttonElement.textContent = btn.text;
+            buttonElement.onclick = btn.action;
+            buttonElement.className = `btn-primary ${btn.isCancel ? 'bg-gray-500 hover:bg-gray-600' : ''}`;
+            modalButtons.appendChild(buttonElement);
+        });
+        commonModal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        commonModal.classList.add('hidden');
+    }
+
+    function scrollToBottom() {
+        invoiceScrollDiv.scrollTop = invoiceScrollDiv.scrollHeight;
+    }
+
+    function clearTransientInputs() {
+        rộngInput.value = '';
+        dàiInput.value = '';
+        rộngInput.focus();
+    }
+
+    // --- MAIN LOGIC ---
+    function createNewItem() {
+        const rộngCm = parseFloat(rộngInput.value);
+        const dàiInputVal = parseFloat(dàiInput.value);
+        const dày = parseFloat(dàyInput.value);
+        const giá = parseFloat(giáInput.value.replace(/\./g, ''));
+        const woodTypeName = woodTypeSelect.options[woodTypeSelect.selectedIndex].text;
+
+        if (isNaN(rộngCm) || isNaN(dàiInputVal) || isNaN(dày) || isNaN(giá)) {
+            showModal('Lỗi', 'Vui lòng nhập đầy đủ các thông tin hợp lệ (rộng, dài, dày, giá).', [{ text: 'OK', action: closeModal }]);
+            return null;
+        }
+
+        const rộng = rộngCm / 100;
+        const dài = dàiInputVal / 10;
+        
+        const thểTích = rộng * dài * (dày / 1000);
+        const woodCost = Math.round(thểTích * giá);
+        const sandingOption = document.querySelector('input[name="sandingOption"]:checked').value;
+        const sandingCostPerM2 = sandingPrices[sandingOption];
+        const sandingCost = Math.round((rộng * dài) * sandingCostPerM2);
+        
+        const totalItemPrice = woodCost + sandingCost;
+        
+        return {
+            rộng: rộng,
+            dài: dài,
+            dày: dày,
+            giá: giá,
+            thểTích: thểTích,
+            woodCost: woodCost,
+            sandingCost: sandingCost,
+            total: totalItemPrice,
+            woodName: woodTypeName,
+            type: 'item' 
+        };
+    }
+
+    function addItem() {
+        const newItem = createNewItem();
+        if (newItem) {
+            invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+            undoBtn.disabled = false;
+
+            if (selectedIndices.size === 1) {
+                const insertAtIndex = Math.min(...selectedIndices);
+                invoiceItemsList.splice(insertAtIndex, 0, newItem);
+            } else {
+                 if (selectedIndices.size > 1) {
+                     showModal('Lưu ý', 'Nhiều mục đang được chọn. Sản phẩm mới sẽ được thêm vào cuối hóa đơn.', [{ text: 'OK', action: closeModal }]);
+                 }
+                invoiceItemsList.push(newItem);
+            }
+            
+            selectedIndices.clear();
+            lastClickedIndex = -1;
+            updateInvoiceDisplay();
+            clearTransientInputs();
+            scrollToBottom();
+        }
+    }
+    
+    function deleteRow(index) {
+        const item = invoiceItemsList[index];
+        if (!item) return;
+
+        const isSubtotal = item.type === 'subtotal';
+        const message = isSubtotal
+            ? 'Bạn có chắc chắn muốn xóa dòng tổng cộng này? Các mục trong nhóm sẽ được gộp lại.'
+            : 'Bạn có chắc chắn muốn xóa tấm gỗ này khỏi hóa đơn?';
+        
+        showModal(
+            'Xác nhận xóa',
+            message,
+            [
+                { text: 'Hủy', action: closeModal, isCancel: true },
+                { text: 'Xóa', action: () => {
+                    invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+                    undoBtn.disabled = false;
+                    invoiceItemsList.splice(index, 1);
+                    selectedIndices.delete(index); 
+                    updateInvoiceDisplay();
+                    closeModal();
+                } }
+            ]
+        );
+    }
+    
+    function deleteSelectedSplits() {
+        const splitsToDelete = [...selectedIndices].filter(index => invoiceItemsList[index]?.type === 'subtotal');
+
+        if (splitsToDelete.length === 0) {
+            showModal('Thông báo', 'Vui lòng chọn một hoặc nhiều dòng "Tổng cộng" để xóa.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+
+        showModal(
+            'Xác nhận xóa',
+            `Bạn có chắc chắn muốn xóa ${splitsToDelete.length} dòng tổng cộng đã chọn? Các mục trong nhóm sẽ được gộp lại.`,
+            [
+                { text: 'Hủy', action: closeModal, isCancel: true },
+                { text: 'Xóa', action: () => {
+                    invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+                    undoBtn.disabled = false;
+                    
+                    invoiceItemsList = invoiceItemsList.filter((item, index) => !splitsToDelete.includes(index));
+                    
+                    selectedIndices.clear();
+                    lastClickedIndex = -1;
+                    updateInvoiceDisplay();
+                    closeModal();
+                } }
+            ]
+        );
+    }
+
+    function updateSelectionState() {
+        if(selectedIndices.size === 1) {
+            addItemBtn.textContent = 'Chèn vào mục đã chọn';
+            addItemBtn.className = 'btn-primary w-full bg-green-600 hover:bg-green-700';
+
+        } else {
+            addItemBtn.textContent = 'Thêm vào hóa đơn';
+            addItemBtn.className = 'btn-primary w-full';
+        }
+    }
+
+    function updateInvoiceDisplay() {
+        invoiceItems.innerHTML = '';
+        let sttCounter = 1;
+        let runningWoodSubtotal = 0;
+        let runningSandingSubtotal = 0;
+
+        invoiceItemsList.forEach((item, index) => {
+            if (item.type === 'subtotal') {
+                // Update the item's values before rendering
+                item.subtotalWood = runningWoodSubtotal;
+                item.subtotalSanding = runningSandingSubtotal;
+
+                const subtotalRow = document.createElement('tr');
+                subtotalRow.className = 'subtotal-row selectable-row';
+                subtotalRow.dataset.index = index;
+                if(selectedIndices.has(index)) {
+                    subtotalRow.classList.add('selected');
+                }
+                
+                subtotalRow.innerHTML = `
+                    <td colspan="5" class="text-right px-4 font-semibold">Tổng cộng:</td>
+                    <td class="text-center font-semibold">${formatNumber(Math.round(item.subtotalSanding))} đ</td>
+                    <td class="text-center font-semibold">${formatNumber(Math.round(item.subtotalWood))} đ</td>
+                    <td class="text-center no-print">
+                        <button onclick="event.stopPropagation(); deleteRow(${index})" class="delete-btn text-red-500 hover:text-red-700">
+                            &#x2715;
+                        </button>
+                    </td>
+                `;
+                invoiceItems.appendChild(subtotalRow);
+                
+                // Reset for next group
+                sttCounter = 1; 
+                runningWoodSubtotal = 0;
+                runningSandingSubtotal = 0;
+
+            } else { // It's an item
+                // Add to running totals for the current group
+                runningWoodSubtotal += item.woodCost;
+                runningSandingSubtotal += item.sandingCost;
+
+                const row = document.createElement('tr');
+                row.className = 'selectable-row';
+                row.dataset.index = index; 
+                if(selectedIndices.has(index)){
+                    row.classList.add('selected');
+                }
+
+                row.innerHTML = `
+                    <td class="text-center px-4">${sttCounter++}</td>
+                    <td class="text-center px-4">${item.woodName}</td>
+                    <td class="text-center">${(item.rộng * 100).toFixed(0)}</td>
+                    <td class="text-center">${(item.dài * 10).toFixed(0)}</td>
+                    <td class="text-center">${item.dày}mm - ${formatNumber(item.giá)} đ</td>
+                    <td class="text-center">${formatNumber(Math.round(item.sandingCost))} đ</td>
+                    <td class="text-center">${formatNumber(Math.round(item.woodCost))} đ</td>
+                    <td class="text-center no-print">
+                        <button onclick="event.stopPropagation(); deleteRow(${index})" class="delete-btn text-red-500 hover:text-red-700">
+                            &#x2715;
+                        </button>
+                    </td>
+                `;
+                invoiceItems.appendChild(row);
+            }
+        });
+        
+        // Recalculate grand totals from items only
+        let finalTotal = 0;
+        let finalSandingTotal = 0;
+        invoiceItemsList.forEach(item => {
+            if (item.type === 'item') {
+                finalTotal += item.total || 0;
+                finalSandingTotal += item.sandingCost || 0;
+            }
+        });
+
+        const totalSandingPriceSpan = document.getElementById('total-sanding-price');
+        totalSandingPriceSpan.textContent = formatNumber(Math.round(finalSandingTotal)) + ' đ';
+        totalPriceSpan.textContent = formatNumber(Math.round(finalTotal)) + ' đ';
+        updateSelectionState();
+    }
+
+
+    function splitInvoice() {
+        invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+        undoBtn.disabled = false;
+
+        let selectionTargetIndices = new Set(selectedIndices);
+        if (selectionTargetIndices.size === 0) {
+            let lastSubtotalIndex = -1;
+            for (let i = invoiceItemsList.length - 1; i >= 0; i--) {
+                if (invoiceItemsList[i].type === 'subtotal') {
+                    lastSubtotalIndex = i;
+                    break;
+                }
+            }
+            const startIndex = lastSubtotalIndex + 1;
+            if (startIndex >= invoiceItemsList.length) {
+                showModal('Lỗi', 'Không có sản phẩm nào chưa được nhóm để tách.', [{ text: 'OK', action: closeModal }]);
+                return;
+            }
+            for (let i = startIndex; i < invoiceItemsList.length; i++) {
+                selectionTargetIndices.add(i);
+            }
+        }
+
+        const selectedItems = invoiceItemsList.filter((_, index) => selectionTargetIndices.has(index) && invoiceItemsList[index].type === 'item');
+        const firstSelectedIndex = selectionTargetIndices.size > 0 ? Math.min(...selectionTargetIndices) : -1;
+        
+        const beforeGroupIndices = new Set();
+        if(firstSelectedIndex > 0) {
+            let lastSubtotalBeforeSelection = -1;
+            for (let i = firstSelectedIndex - 1; i >= 0; i--) {
+                if (invoiceItemsList[i].type === 'subtotal') {
+                    lastSubtotalBeforeSelection = i;
+                    break;
+                }
+            }
+            for (let i = lastSubtotalBeforeSelection + 1; i < firstSelectedIndex; i++) {
+                if (invoiceItemsList[i].type === 'item') {
+                    beforeGroupIndices.add(i);
+                }
+            }
+        }
+        
+        const beforeGroupItems = invoiceItemsList.filter((_, index) => beforeGroupIndices.has(index) && invoiceItemsList[index].type === 'item');
+        const remainingItems = invoiceItemsList.filter((_, index) => !selectionTargetIndices.has(index) && !beforeGroupIndices.has(index));
+
+        const finalGroupedSection = [];
+        if (beforeGroupItems.length > 0) {
+             finalGroupedSection.push(...beforeGroupItems, { type: 'subtotal' });
+        }
+
+        if (selectedItems.length > 0) {
+            finalGroupedSection.push(...selectedItems, { type: 'subtotal' });
+        }
+
+        let tempNewList = [...remainingItems, ...finalGroupedSection];
+        invoiceItemsList = tempNewList.filter((item, index) => {
+            if (item.type !== 'subtotal') return true;
+            const prevItem = index > 0 ? tempNewList[index - 1] : null;
+            return prevItem && prevItem.type === 'item';
+        });
+
+        selectedIndices.clear();
+        lastClickedIndex = -1;
+        updateInvoiceDisplay();
+    }
+    
+    function undoSplit() {
+        if (invoiceHistory.length > 0) {
+            invoiceItemsList = invoiceHistory.pop();
+            if (invoiceHistory.length === 0) {
+                undoBtn.disabled = true;
+            }
+            updateInvoiceDisplay();
+        }
+    }
+
+    function clearInvoice() {
+        showModal(
+            'Xác nhận xóa',
+            'Bạn có chắc muốn xóa toàn bộ hóa đơn và bắt đầu lại?',
+            [
+                { text: 'Hủy', action: closeModal, isCancel: true },
+                { text: 'Xóa', action: () => {
+                     invoiceItemsList = [];
+                    invoiceHistory = [];
+                    undoBtn.disabled = true;
+                    selectedIndices.clear();
+                    lastClickedIndex = -1;
+                    updateInvoiceDisplay();
+                    customerNameInput.value = '';
+                    customerPhoneInput.value = '';
+                    customerNameDisplay.textContent = '';
+                    customerPhoneDisplay.textContent = '';
+                    invoiceNumber = 1;
+                    closeModal();
+                } }
+            ]
+        );
+    }
+    
+    // --- WOOD TYPE MANAGEMENT ---
+    function openAddWoodModal() {
+        addWoodModal.classList.remove('hidden');
+    }
+
+    function closeAddWoodModal() {
+        addWoodModal.classList.add('hidden');
+        woodTypeSelect.value = 'soi'; 
+        updateInputsForSelectedWood();
+    }
+
+    function saveNewWoodType() {
+        const name = newWoodNameInput.value.trim();
+        const dày = parseFloat(newWoodDàyInput.value);
+        const giá = parseFloat(newWoodGiáInput.value);
+
+        if (!name || isNaN(dày) || isNaN(giá)) {
+            showModal('Lỗi', 'Vui lòng điền đầy đủ thông tin hợp lệ.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+
+        const newKey = `custom_${Date.now()}`;
+        woodData[newKey] = { dày: dày, giá: giá, name: name };
+
+        const newOption = document.createElement('option');
+        newOption.value = newKey;
+        newOption.textContent = name;
+        woodTypeSelect.insertBefore(newOption, woodTypeSelect.lastElementChild);
+        woodTypeSelect.value = newKey;
+        
+        closeAddWoodModal();
+        newWoodNameInput.value = '';
+        newWoodDàyInput.value = '';
+        newWoodGiáInput.value = '';
+        updateInputsForSelectedWood();
+    }
+
+    function deleteSelectedWood() {
+        const selectedValue = woodTypeSelect.value;
+        const selectedText = woodTypeSelect.options[woodTypeSelect.selectedIndex].text;
+
+        if (!selectedValue.startsWith('custom_')) {
+            showModal('Không thể xóa', 'Bạn không thể xóa các loại gỗ mặc định.', [{ text: 'OK', action: closeModal }]);
+        } else {
+            showModal(
+                'Xác nhận xóa',
+                `Bạn có chắc chắn muốn xóa loại gỗ "${selectedText}"?`,
+                [
+                    { text: 'Hủy', action: closeModal, isCancel: true },
+                    { text: 'Xóa', action: () => {
+                        delete woodData[selectedValue];
+                        const optionToRemove = woodTypeSelect.querySelector(`option[value="${selectedValue}"]`);
+                        if (optionToRemove) optionToRemove.remove();
+                        woodTypeSelect.value = 'soi';
+                        updateInputsForSelectedWood();
+                        closeModal();
+                    } }
+                ]
+            );
+        }
+    }
+    
+    function updateInputsForSelectedWood(){
+        const selectedKey = woodTypeSelect.value;
+        const data = woodData[selectedKey];
+        dàyInput.value = data?.dày || '';
+        giáInput.value = formatNumber(data?.giá) || '';
+    }
+    
+    // --- SAVE / PRINT ---
+    function saveInvoice() {
+        if (invoiceItemsList.length === 0) {
+            showModal('Lỗi', 'Hóa đơn trống. Vui lòng thêm sản phẩm trước khi lưu hoặc in.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+
+        customerNameDisplay.textContent = customerNameInput.value || '-----------';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
+        const date = new Date();
+        const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+        const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        const filenameDate = formattedDate.replace(/\//g, '-');
+        invoiceMeta.textContent = `Số: ${String(invoiceNumber).padStart(3, '0')} - Ngày: ${formattedDate} - Giờ in: ${formattedTime}`;
+        
+        const customerNameForFile = (customerNameInput.value.trim() || 'KH_LE').replace(/[\/\\?%*:|"<>]/g, '-');
+        document.title = `${customerNameForFile}_${filenameDate}`;
+
+        window.print();
+        invoiceNumber++;
+    }
+
+
+    // --- EVENT LISTENERS ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Price input formatting
+        giáInput.addEventListener('input', (e) => {
+            let value = e.target.value;
+            let cleanedValue = value.replace(/\D/g, '');
+            e.target.value = formatNumber(cleanedValue);
+        });
+
+        // Enter key navigation
+        dàyInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); giáInput.focus(); }
+        });
+        giáInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); rộngInput.focus(); }
+        });
+        rộngInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); dàiInput.focus(); }
+        });
+        dàiInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+        });
+
+        // Rapid entry listeners
+        rộngInput.addEventListener('input', (e) => {
+            if (e.target.value.length >= 2) dàiInput.focus();
+        });
+         dàiInput.addEventListener('input', (e) => {
+            if (e.target.value.length >= 2) addItem();
+        });
+
+        // Wood type selection change
+        woodTypeSelect.addEventListener('change', () => {
+            if (woodTypeSelect.value === 'add_new') openAddWoodModal();
+            else updateInputsForSelectedWood();
+        });
+        
+        // Restore document title after printing
+        window.addEventListener('afterprint', () => {
+            document.title = originalDocumentTitle;
+        });
+        
+        // Selection Listeners
+        invoiceItems.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            selectedIndices.clear();
+            lastClickedIndex = -1;
+            updateInvoiceDisplay();
+        });
+
+        invoiceItems.addEventListener('mousedown', (e) => {
+             // If the mousedown is on a button, let its own click handler fire. Do not start selection.
+             if (e.target.closest('button')) {
+                 return;
+             }
+             const row = e.target.closest('tr.selectable-row');
+             if (!row) return;
+             isDragging = true;
+             handleSelection(e);
+        });
+        document.addEventListener('mousemove', (e) => {
+            if(isDragging) handleSelection(e);
+        });
+        document.addEventListener('mouseup', () => isDragging = false);
+
+        // Sanding shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (!e.shiftKey || selectedIndices.size === 0 || document.activeElement.tagName === 'INPUT') return;
+
+            let newSandingOption = null;
+            if (e.key.toUpperCase() === 'N') newSandingOption = 'one-side';
+            if (e.key.toUpperCase() === 'M') newSandingOption = 'two-sides';
+            if (e.key.toUpperCase() === 'B') newSandingOption = 'none';
+
+            if (newSandingOption !== null) {
+                e.preventDefault();
+                invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+                undoBtn.disabled = false;
+                selectedIndices.forEach(index => {
+                    const item = invoiceItemsList[index];
+                    if (item && item.type === 'item') {
+                        const sandingCostPerM2 = sandingPrices[newSandingOption];
+                        const newSandingCost = Math.round((item.rộng * item.dài) * sandingCostPerM2);
+                        
+                        item.sandingCost = newSandingCost;
+                        item.total = item.woodCost + newSandingCost;
+                    }
+                });
+                updateInvoiceDisplay();
+            }
+        });
+
+        // Initial setup
+        updateInvoiceDisplay();
+    });
+
+     // --- SELECTION LOGIC ---
+    function handleSelection(event) {
+        const row = event.target.closest('tr.selectable-row');
+        if (!row) return;
+
+        const index = parseInt(row.dataset.index);
+
+        if (event.type === 'mousedown') {
+            dragStartIndex = index;
+            if (!event.ctrlKey && !event.shiftKey) {
+                selectedIndices.clear();
+                selectedIndices.add(index);
+                lastClickedIndex = index;
+            } else if (event.ctrlKey) {
+                if (selectedIndices.has(index)) {
+                    selectedIndices.delete(index);
+                } else {
+                    selectedIndices.add(index);
+                }
+                lastClickedIndex = index;
+            } else if (event.shiftKey && lastClickedIndex !== -1) {
+                const start = Math.min(index, lastClickedIndex);
+                const end = Math.max(index, lastClickedIndex);
+                if(!isDragging) selectedIndices.clear(); 
+                for (let i = start; i <= end; i++) {
+                    if (invoiceItemsList[i]) {
+                       selectedIndices.add(i);
+                    }
+                }
+            }
+            updateInvoiceDisplay();
+        } else if (event.type === 'mousemove' && isDragging) {
+            const start = Math.min(dragStartIndex, index);
+            const end = Math.max(dragStartIndex, index);
+            selectedIndices.clear();
+            for (let i = start; i <= end; i++) {
+                if (invoiceItemsList[i]) {
+                   selectedIndices.add(i);
+                }
+            }
+            updateInvoiceDisplay();
+        }
+    }
+</script>
+
+</body>
+</html>
+
