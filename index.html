@@ -301,15 +301,15 @@
                     <span id="total-price">0 đ</span>
                 </div>
             </div>
-            <div class="mt-4 text-right">
-                <p class="font-semibold mb-2">Người bán</p>
-                <div class="h-20 w-40 inline-block border-b border-gray-400"></div>
-            </div>
-
+            
             <div class="mt-4 pt-4 border-t border-gray-200 text-sm">
                 <p class="font-semibold mb-1">Phương thức thanh toán:</p>
                 <p>Ngân hàng ACB - Đỗ Ngọc Vũ - 7352437</p>
                 <p>Ngân hàng Vietcombank - Đỗ Ngọc Vũ - 0081001135640</p>
+            </div>
+
+            <div class="mt-8 text-left">
+                <div class="h-20 w-40 inline-block"></div>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-4 mt-4 controls no-print">
@@ -832,8 +832,8 @@
             return;
         }
 
-        customerNameDisplay.textContent = customerNameInput.value || '-----------';
-        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
+        customerNameDisplay.textContent = customerNameInput.value || ' ';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || ' ';
         const date = new Date();
         const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
