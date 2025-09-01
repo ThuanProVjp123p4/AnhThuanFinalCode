@@ -219,11 +219,11 @@
                 <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
                 <div class="flex items-center gap-2 mt-1">
                     <select id="woodType" class="input-field">
-                        <option value="soi">Gỗ Sồi</option>
-                        <option value="lim">Gỗ Lim</option>
-                        <option value="thong">Gỗ Thông</option>
-                        <option value="ash">Gỗ Ash</option>
-                        <option value="xoan">Gần Xoan</option>
+                        <option value="soi">Sồi</option>
+                        <option value="lim">Thông</option>
+                        <option value="thong">Thông Xoan Đào</option>
+                        <option value="ash">Ash</option>
+                        <option value="xoan">Xoan đào</option>
                         <option value="add_new">Thêm loại gỗ mới</option>
                     </select>
                     <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
@@ -950,8 +950,8 @@
             return null;
         }
 
-        customerNameDisplay.textContent = customerNameInput.value || '-----------';
-        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
+        customerNameDisplay.textContent = customerNameInput.value || ' ';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || ' ';
         const date = new Date();
         const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
