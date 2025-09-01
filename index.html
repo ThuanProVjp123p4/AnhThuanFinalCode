@@ -18,6 +18,9 @@
             min-height: 100vh;
             padding: 2rem;
         }
+        body.is-moving-items .selectable-row {
+            cursor: move;
+        }
         .container {
             background-color: #ffffff;
             border-radius: 1.5rem;
@@ -106,8 +109,8 @@
              background-color: #dbeafe; /* A slightly darker blue for selection */
              color: #1e3a8a;
         }
-        .invoice-table.is-dragging,
-        .invoice-table.is-dragging * {
+        .is-dragging, .is-dragging * {
+            cursor: grabbing !important;
             user-select: none;
             -webkit-user-select: none;
             -moz-user-select: none;
@@ -216,11 +219,11 @@
                 <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
                 <div class="flex items-center gap-2 mt-1">
                     <select id="woodType" class="input-field">
-                        <option value="soi">Sồi đỏ</option>
-                        <option value="lim">Thông</option>
-                        <option value="thong">Thông biến tính</option>
-                        <option value="ash">Ash</option>
-                        <option value="xoan">Xoan đào</option>
+                        <option value="soi">Gỗ Sồi</option>
+                        <option value="lim">Gỗ Lim</option>
+                        <option value="thong">Gỗ Thông</option>
+                        <option value="ash">Gỗ Ash</option>
+                        <option value="xoan">Gần Xoan</option>
                         <option value="add_new">Thêm loại gỗ mới</option>
                     </select>
                     <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
@@ -259,9 +262,11 @@
                 <button id="manualModeBtn" onclick="toggleManualMode()" class="btn-primary w-1/3 bg-teal-500 hover:bg-teal-600">Hàng tay</button>
             </div>
             
-            <div class="flex space-x-2 mt-2">
-                <button onclick="splitInvoice()" class="btn-primary w-1/2 bg-blue-500 hover:bg-blue-600">Tách mục đã chọn</button>
-                <button onclick="deleteSelectedSplits()" class="btn-primary w-1/2 bg-yellow-500 hover:bg-yellow-600 text-gray-800">Xóa tách đã chọn</button>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <button onclick="splitInvoice()" class="btn-primary w-full bg-blue-500 hover:bg-blue-600">Tách</button>
+                <button id="moveBtn" onclick="startMove()" class="btn-primary w-full bg-purple-500 hover:bg-purple-600">Di chuyển</button>
+                <button onclick="editSelectedItems()" class="btn-primary w-full bg-indigo-500 hover:bg-indigo-600">Sửa dày giá</button>
+                <button onclick="deleteSelectedSplits()" class="btn-primary w-full bg-yellow-500 hover:bg-yellow-600 text-gray-800">Xóa tách</button>
             </div>
         </div>
 
@@ -404,6 +409,7 @@
     const addItemBtn = document.getElementById('addItemBtn');
     const undoBtn = document.getElementById('undoBtn');
     const manualModeBtn = document.getElementById('manualModeBtn');
+    const moveBtn = document.getElementById('moveBtn');
     const manualPriceWrapper = document.getElementById('manualPriceWrapper');
     const manualPriceInput = document.getElementById('manualPrice');
 
@@ -426,12 +432,14 @@
     let invoiceNumber = 1;
     let selectedIndices = new Set();
     let lastClickedIndex = -1;
-    let isDragging = false;
+    let isMouseDown = false;
     let dragStartIndex = -1;
+    let isMoveMode = false;
+    let movePlaceholder = null;
     let isManualMode = false;
     let autoScrollInterval = null;
     let originalDocumentTitle = document.title;
-
+    
 
     // --- HELPERS ---
     function formatNumber(n) {
@@ -536,10 +544,22 @@
         if (newItem) {
             invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
             undoBtn.disabled = false;
-
+    
+            let insertAtIndex = -1;
+    
             if (selectedIndices.size === 1) {
-                const insertAtIndex = Math.min(...selectedIndices);
-                invoiceItemsList.splice(insertAtIndex, 0, newItem);
+                const selectedIndex = Math.min(...selectedIndices);
+                const isLastInGroup = (selectedIndex === invoiceItemsList.length - 1) || (invoiceItemsList[selectedIndex + 1]?.type === 'subtotal');
+                
+                if (isLastInGroup) {
+                    insertAtIndex = selectedIndex + 1; // Insert AFTER
+                } else {
+                    insertAtIndex = selectedIndex; // Insert BEFORE
+                }
+            }
+    
+            if (insertAtIndex !== -1) {
+                 invoiceItemsList.splice(insertAtIndex, 0, newItem);
             } else {
                  if (selectedIndices.size > 1) {
                      showModal('Lưu ý', 'Nhiều mục đang được chọn. Sản phẩm mới sẽ được thêm vào cuối hóa đơn.', [{ text: 'OK', action: closeModal }]);
@@ -607,6 +627,40 @@
                 } }
             ]
         );
+    }
+
+    function editSelectedItems() {
+        if (selectedIndices.size === 0) {
+            showModal('Lỗi', 'Vui lòng chọn các mục cần sửa.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+
+        const newDay = parseFloat(dàyInput.value);
+        const newGia = parseFloat(giáInput.value.replace(/\./g, ''));
+
+        if (isNaN(newDay) || isNaN(newGia)) {
+            showModal('Lỗi', 'Vui lòng nhập Dày và Giá hợp lệ để sửa.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+
+        invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+        undoBtn.disabled = false;
+
+        selectedIndices.forEach(index => {
+            const item = invoiceItemsList[index];
+            if (item && item.type === 'item') {
+                item.dày = newDay;
+                item.giá = newGia;
+                item.manualPrice = null; // Exit manual mode for this item if it was set
+
+                // Recalculate based on standard formula
+                const thểTích = item.rộng * item.dài * (item.dày / 1000);
+                item.woodCost = Math.round(thểTích * item.giá);
+                item.total = item.woodCost + item.sandingCost;
+            }
+        });
+
+        updateInvoiceDisplay();
     }
 
     function updateSelectionState() {
@@ -713,6 +767,7 @@
         totalSandingPriceSpan.textContent = formatNumber(Math.round(finalSandingTotal)) + ' đ';
         totalPriceSpan.textContent = formatNumber(Math.round(finalTotal)) + ' đ';
         updateSelectionState();
+        populateInputsFromSelection();
     }
 
 
@@ -895,8 +950,8 @@
             return null;
         }
 
-        customerNameDisplay.textContent = customerNameInput.value || ' ';
-        customerPhoneDisplay.textContent = customerPhoneInput.value || ' ';
+        customerNameDisplay.textContent = customerNameInput.value || '-----------';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
         const date = new Date();
         const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -964,6 +1019,37 @@
             manualModeBtn.classList.add('bg-teal-500', 'hover:bg-teal-600');
             manualModeBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
         }
+    }
+
+    // --- MOVE MODE ---
+    function startMove() {
+        if (isMoveMode) {
+            cancelMove();
+            return;
+        }
+
+        if (selectedIndices.size === 0) {
+            showModal('Lỗi', 'Vui lòng chọn một hoặc nhiều mục để di chuyển.', [{ text: 'OK', action: closeModal }]);
+            return;
+        }
+    
+        isMoveMode = true;
+        document.body.classList.add('is-moving-items');
+        moveBtn.textContent = 'HỦY DI CHUYỂN';
+        moveBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+        moveBtn.classList.add('bg-orange-500', 'hover:bg-orange-600');
+    }
+
+    function cancelMove() {
+        isMoveMode = false;
+        document.body.classList.remove('is-moving-items');
+        if (movePlaceholder) {
+            movePlaceholder.remove();
+            movePlaceholder = null;
+        }
+        moveBtn.textContent = 'Di chuyển';
+        moveBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+        moveBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
     }
 
     // --- EVENT LISTENERS ---
@@ -1061,23 +1147,19 @@
         });
 
         invoiceItems.addEventListener('mousedown', (e) => {
-             if (e.target.closest('button')) return;
-             const row = e.target.closest('tr.selectable-row');
-             if (!row) return;
-             isDragging = true;
-             handleSelection(e);
+            handleMouseDown(e);
         });
-
         document.addEventListener('mousemove', (e) => {
-            if(isDragging) {
-                handleSelection(e);
-                handleAutoScroll(e);
-            }
+            handleMouseMove(e);
         });
-        document.addEventListener('mouseup', () => {
-             isDragging = false;
-             clearInterval(autoScrollInterval);
-             autoScrollInterval = null;
+        document.addEventListener('mouseup', (e) => {
+            handleMouseUp(e);
+        });
+        invoiceItems.addEventListener('mouseleave', (e) => {
+            if(isMoveMode && movePlaceholder) {
+                movePlaceholder.remove();
+                movePlaceholder = null;
+            }
         });
 
         // Sanding shortcuts
@@ -1111,38 +1193,115 @@
         updateInvoiceDisplay();
     });
 
-     // --- SELECTION LOGIC ---
+     // --- SELECTION & DRAG LOGIC ---
+    function populateInputsFromSelection() {
+        if (selectedIndices.size === 1) {
+            const index = [...selectedIndices][0];
+            const item = invoiceItemsList[index];
+            if (item && item.type === 'item') {
+                // Find the correct option in the select dropdown
+                let woodOptionFound = false;
+                for(let option of woodTypeSelect.options) {
+                    if (option.text === item.woodName) {
+                        woodTypeSelect.value = option.value;
+                        woodOptionFound = true;
+                        break;
+                    }
+                }
+                
+                dàyInput.value = item.dày;
+                giáInput.value = formatNumber(item.giá);
+                manualPriceInput.value = formatNumber(item.manualPrice);
+            }
+        }
+    }
+    
+    function handleMouseDown(e) {
+        if (e.target.closest('button')) return; 
+        const row = e.target.closest('tr.selectable-row');
+        if (!row) return;
+
+        if (isMoveMode) {
+            const dropIndex = parseInt(row.dataset.index);
+            
+            invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
+            undoBtn.disabled = false;
+    
+            const movedIndices = Array.from(selectedIndices).sort((a,b) => a-b);
+            const movedItems = movedIndices.map(i => invoiceItemsList[i]);
+            const remainingItems = invoiceItemsList.filter((_, i) => !movedIndices.includes(i));
+            
+            const itemsBeforeDrop = movedIndices.filter(i => i < dropIndex).length;
+            const adjustedDropIndex = dropIndex - itemsBeforeDrop;
+            
+            remainingItems.splice(adjustedDropIndex, 0, ...movedItems);
+            invoiceItemsList = remainingItems;
+    
+            const newIndices = new Set();
+            for (let i = 0; i < movedItems.length; i++) {
+                newIndices.add(adjustedDropIndex + i);
+            }
+            selectedIndices = newIndices;
+    
+            cancelMove(); 
+            updateInvoiceDisplay();
+            return; 
+        }
+
+        isMouseDown = true;
+        handleSelection(e);
+    }
+
+    function handleMouseMove(e) {
+        if (isMoveMode) {
+            showMovePlaceholder(e);
+        } else if (isMouseDown) {
+            handleSelection(e);
+            handleAutoScroll(e);
+        }
+    }
+
+    function handleMouseUp(e) {
+        isMouseDown = false;
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+    }
+
+
     function handleSelection(event) {
         const row = event.target.closest('tr.selectable-row');
         if (!row) return;
 
         const index = parseInt(row.dataset.index);
+        const isSelected = selectedIndices.has(index);
 
         if (event.type === 'mousedown') {
             dragStartIndex = index;
             if (!event.ctrlKey && !event.shiftKey) {
-                selectedIndices.clear();
-                selectedIndices.add(index);
-                lastClickedIndex = index;
+                if(!isSelected) {
+                    selectedIndices.clear();
+                    selectedIndices.add(index);
+                }
             } else if (event.ctrlKey) {
-                if (selectedIndices.has(index)) {
+                if (isSelected) {
                     selectedIndices.delete(index);
                 } else {
                     selectedIndices.add(index);
                 }
-                lastClickedIndex = index;
             } else if (event.shiftKey && lastClickedIndex !== -1) {
                 const start = Math.min(index, lastClickedIndex);
                 const end = Math.max(index, lastClickedIndex);
-                if(!isDragging) selectedIndices.clear(); 
+                selectedIndices.clear();
                 for (let i = start; i <= end; i++) {
                     if (invoiceItemsList[i]) {
                        selectedIndices.add(i);
                     }
                 }
             }
+            lastClickedIndex = index;
             updateInvoiceDisplay();
-        } else if (event.type === 'mousemove' && isDragging) {
+        } else if (event.type === 'mousemove') {
+            if (event.buttons !== 1) return;
             const start = Math.min(dragStartIndex, index);
             const end = Math.max(dragStartIndex, index);
             selectedIndices.clear();
@@ -1154,6 +1313,36 @@
             updateInvoiceDisplay();
         }
     }
+
+    function showMovePlaceholder(e) {
+        if (!movePlaceholder) {
+            movePlaceholder = document.createElement('tr');
+            movePlaceholder.className = 'move-placeholder';
+            movePlaceholder.innerHTML = `<td colspan="8"></td>`;
+        }
+        
+        const afterElement = getElementToDropBefore(invoiceItems, e.clientY);
+        if (afterElement == null) {
+            invoiceItems.appendChild(movePlaceholder);
+        } else {
+            invoiceItems.insertBefore(movePlaceholder, afterElement);
+        }
+    }
+
+    function getElementToDropBefore(container, y) {
+        const rows = [...container.querySelectorAll('tr.selectable-row')];
+
+        return rows.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
 
     function handleAutoScroll(e) {
         clearInterval(autoScrollInterval);
