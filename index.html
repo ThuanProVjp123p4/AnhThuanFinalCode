@@ -219,11 +219,11 @@
                 <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
                 <div class="flex items-center gap-2 mt-1">
                     <select id="woodType" class="input-field">
-                        <option value="soi">Sồi đỏ</option>
-                        <option value="lim">Thông</option>
-                        <option value="thong">Thông Xoan Đào</option>
-                        <option value="ash">Ash</option>
-                        <option value="xoan">Xoan đào</option>
+                        <option value="soi">Gỗ Sồi</option>
+                        <option value="lim">Gỗ Lim</option>
+                        <option value="thong">Gỗ Thông</option>
+                        <option value="ash">Gỗ Ash</option>
+                        <option value="xoan">Gần Xoan</option>
                         <option value="add_new">Thêm loại gỗ mới</option>
                     </select>
                     <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
@@ -262,11 +262,11 @@
                 <button id="manualModeBtn" onclick="toggleManualMode()" class="btn-primary w-1/3 bg-teal-500 hover:bg-teal-600">Hàng tay</button>
             </div>
             
-            <div class="grid grid-cols-2 gap-2 mt-2">
+            <div class="grid grid-cols-3 gap-2 mt-2">
                 <button onclick="splitInvoice()" class="btn-primary w-full bg-blue-500 hover:bg-blue-600">Tách</button>
                 <button id="moveBtn" onclick="startMove()" class="btn-primary w-full bg-purple-500 hover:bg-purple-600">Di chuyển</button>
                 <button onclick="editSelectedItems()" class="btn-primary w-full bg-indigo-500 hover:bg-indigo-600">Sửa dày giá</button>
-                <button onclick="deleteSelectedSplits()" class="btn-primary w-full bg-yellow-500 hover:bg-yellow-600 text-gray-800">Xóa tách</button>
+                <button onclick="deleteSelected()" class="btn-primary w-full bg-red-500 hover:bg-red-600 col-span-3">Xóa mục đã chọn</button>
             </div>
         </div>
 
@@ -601,24 +601,23 @@
         );
     }
     
-    function deleteSelectedSplits() {
-        const splitsToDelete = [...selectedIndices].filter(index => invoiceItemsList[index]?.type === 'subtotal');
-
-        if (splitsToDelete.length === 0) {
-            showModal('Thông báo', 'Vui lòng chọn một hoặc nhiều dòng "Tổng cộng" để xóa.', [{ text: 'OK', action: closeModal }]);
+    function deleteSelected() {
+        if (selectedIndices.size === 0) {
+            showModal('Thông báo', 'Vui lòng chọn một hoặc nhiều mục để xóa.', [{ text: 'OK', action: closeModal }]);
             return;
         }
 
         showModal(
             'Xác nhận xóa',
-            `Bạn có chắc chắn muốn xóa ${splitsToDelete.length} dòng tổng cộng đã chọn? Các mục trong nhóm sẽ được gộp lại.`,
+            `Bạn có chắc chắn muốn xóa ${selectedIndices.size} mục đã chọn?`,
             [
                 { text: 'Hủy', action: closeModal, isCancel: true },
                 { text: 'Xóa', action: () => {
                     invoiceHistory.push(JSON.parse(JSON.stringify(invoiceItemsList)));
                     undoBtn.disabled = false;
                     
-                    invoiceItemsList = invoiceItemsList.filter((item, index) => !splitsToDelete.includes(index));
+                    // Filter out the selected items
+                    invoiceItemsList = invoiceItemsList.filter((item, index) => !selectedIndices.has(index));
                     
                     selectedIndices.clear();
                     lastClickedIndex = -1;
@@ -950,8 +949,8 @@
             return null;
         }
 
-        customerNameDisplay.textContent = customerNameInput.value || ' ';
-        customerPhoneDisplay.textContent = customerPhoneInput.value || ' ';
+        customerNameDisplay.textContent = customerNameInput.value || '-----------';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
         const date = new Date();
         const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -1043,10 +1042,6 @@
     function cancelMove() {
         isMoveMode = false;
         document.body.classList.remove('is-moving-items');
-        if (movePlaceholder) {
-            movePlaceholder.remove();
-            movePlaceholder = null;
-        }
         moveBtn.textContent = 'Di chuyển';
         moveBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
         moveBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
@@ -1254,7 +1249,7 @@
 
     function handleMouseMove(e) {
         if (isMoveMode) {
-            showMovePlaceholder(e);
+            // Placeholder logic removed as per user request
         } else if (isMouseDown) {
             handleSelection(e);
             handleAutoScroll(e);
@@ -1313,36 +1308,6 @@
             updateInvoiceDisplay();
         }
     }
-
-    function showMovePlaceholder(e) {
-        if (!movePlaceholder) {
-            movePlaceholder = document.createElement('tr');
-            movePlaceholder.className = 'move-placeholder';
-            movePlaceholder.innerHTML = `<td colspan="8"></td>`;
-        }
-        
-        const afterElement = getElementToDropBefore(invoiceItems, e.clientY);
-        if (afterElement == null) {
-            invoiceItems.appendChild(movePlaceholder);
-        } else {
-            invoiceItems.insertBefore(movePlaceholder, afterElement);
-        }
-    }
-
-    function getElementToDropBefore(container, y) {
-        const rows = [...container.querySelectorAll('tr.selectable-row')];
-
-        return rows.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
 
     function handleAutoScroll(e) {
         clearInterval(autoScrollInterval);
