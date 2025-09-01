@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phần mềm tính tiền gỗ</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         body {
@@ -39,6 +40,10 @@
             outline: none;
             border-color: #6366f1;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        .input-field:disabled {
+            background-color: #e2e8f0;
+            cursor: not-allowed;
         }
         .btn-primary {
             background-color: #6366f1;
@@ -149,6 +154,9 @@
             .controls, .no-print {
                 display: none !important;
             }
+            #invoice-content {
+                 padding: 0 !important;
+            }
             .invoice-table {
                 width: 100% !important;
                 border-collapse: collapse;
@@ -208,11 +216,11 @@
                 <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
                 <div class="flex items-center gap-2 mt-1">
                     <select id="woodType" class="input-field">
-                        <option value="soi">Gỗ Sồi</option>
-                        <option value="lim">Gỗ Lim</option>
-                        <option value="thong">Gỗ Thông</option>
-                        <option value="ash">Gỗ Ash</option>
-                        <option value="xoan">Gần Xoan</option>
+                        <option value="soi">Sồi đỏ</option>
+                        <option value="lim">Thông</option>
+                        <option value="thong">Thông biến tính</option>
+                        <option value="ash">Ash</option>
+                        <option value="xoan">Xoan đào</option>
                         <option value="add_new">Thêm loại gỗ mới</option>
                     </select>
                     <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
@@ -222,7 +230,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="dày" class="block text-sm font-medium text-gray-700">Dày (mm)</label>
-                    <input type="number" id="dày" class="input-field mt-1" placeholder="Dày" step="0.01">
+                    <input type="text" id="dày" class="input-field mt-1" placeholder="Dày" inputmode="decimal">
                 </div>
                 <div>
                     <label for="giá" class="block text-sm font-medium text-gray-700">Giá (VND/m³)</label>
@@ -230,19 +238,25 @@
                 </div>
             </div>
 
+            <div id="manualPriceWrapper" class="hidden">
+                 <label for="manualPrice" class="block text-sm font-medium text-gray-700">Giá hàng tay (VND/m)</label>
+                 <input type="text" id="manualPrice" class="input-field mt-1" placeholder="Giá theo mét dài" inputmode="numeric">
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label for="rộng" class="block text-sm font-medium text-gray-700">Rộng (cm)</label>
-                    <input type="number" id="rộng" class="input-field mt-1" placeholder="Rộng" step="0.01">
+                    <input type="text" id="rộng" class="input-field mt-1" placeholder="Rộng" inputmode="decimal">
                 </div>
                 <div>
                     <label for="dài" class="block text-sm font-medium text-gray-700">Dài (x10 cm)</label>
-                    <input type="number" id="dài" class="input-field mt-1" placeholder="Dài" step="0.01">
+                    <input type="text" id="dài" class="input-field mt-1" placeholder="Dài" inputmode="decimal">
                 </div>
             </div>
             
-            <div class="flex space-x-2 mt-4">
-                <button id="addItemBtn" onclick="addItem()" class="btn-primary w-full">Thêm vào hóa đơn</button>
+             <div class="flex space-x-2 mt-4">
+                <button id="addItemBtn" onclick="addItem()" class="btn-primary w-2/3">Thêm vào hóa đơn</button>
+                <button id="manualModeBtn" onclick="toggleManualMode()" class="btn-primary w-1/3 bg-teal-500 hover:bg-teal-600">Hàng tay</button>
             </div>
             
             <div class="flex space-x-2 mt-2">
@@ -252,7 +266,7 @@
         </div>
 
         <!-- Phần hóa đơn -->
-        <div>
+        <div id="invoice-content" class="p-4">
             <div class="invoice-header">
                 <div class="company-info">
                     <h2 class="font-bold text-lg leading-tight">GỖ NGỌC CHÂU</h2>
@@ -309,6 +323,7 @@
             </div>
 
             <div class="mt-8 text-left">
+                <p class="font-semibold mb-2">Người bán</p>
                 <div class="h-20 w-40 inline-block"></div>
             </div>
 
@@ -317,7 +332,8 @@
                  <button onclick="clearInvoice()" class="btn-primary w-full sm:w-1/2 bg-red-500 hover:bg-red-600">Xóa hóa đơn</button>
             </div>
              <div class="flex flex-col sm:flex-row gap-4 mt-2 controls no-print">
-                <button onclick="saveInvoice()" class="btn-primary w-full bg-green-500 hover:bg-green-600">Lưu PDF / In Hóa Đơn</button>
+                <button onclick="saveAsPdf()" class="btn-primary w-full sm:w-1/2 bg-green-500 hover:bg-green-600">Lưu PDF</button>
+                <button onclick="printInvoice()" class="btn-primary w-full sm:w-1/2">In Hóa Đơn</button>
             </div>
         </div>
     </div>
@@ -387,6 +403,9 @@
     const newWoodGiáInput = document.getElementById('newWoodGiá');
     const addItemBtn = document.getElementById('addItemBtn');
     const undoBtn = document.getElementById('undoBtn');
+    const manualModeBtn = document.getElementById('manualModeBtn');
+    const manualPriceWrapper = document.getElementById('manualPriceWrapper');
+    const manualPriceInput = document.getElementById('manualPrice');
 
     const commonModal = document.getElementById('commonModal');
     const modalTitle = document.getElementById('modalTitle');
@@ -409,6 +428,8 @@
     let lastClickedIndex = -1;
     let isDragging = false;
     let dragStartIndex = -1;
+    let isManualMode = false;
+    let autoScrollInterval = null;
     let originalDocumentTitle = document.title;
 
 
@@ -441,9 +462,15 @@
     }
 
     function clearTransientInputs() {
-        rộngInput.value = '';
+        if (!isManualMode) {
+             rộngInput.value = '';
+        }
         dàiInput.value = '';
-        rộngInput.focus();
+        if (isManualMode) {
+            dàiInput.focus();
+        } else {
+            rộngInput.focus();
+        }
     }
 
     // --- MAIN LOGIC ---
@@ -451,19 +478,39 @@
         const rộngCm = parseFloat(rộngInput.value);
         const dàiInputVal = parseFloat(dàiInput.value);
         const dày = parseFloat(dàyInput.value);
-        const giá = parseFloat(giáInput.value.replace(/\./g, ''));
-        const woodTypeName = woodTypeSelect.options[woodTypeSelect.selectedIndex].text;
 
-        if (isNaN(rộngCm) || isNaN(dàiInputVal) || isNaN(dày) || isNaN(giá)) {
-            showModal('Lỗi', 'Vui lòng nhập đầy đủ các thông tin hợp lệ (rộng, dài, dày, giá).', [{ text: 'OK', action: closeModal }]);
-            return null;
+        if (isNaN(rộngCm) || isNaN(dàiInputVal) || isNaN(dày)) {
+             showModal('Lỗi', 'Vui lòng nhập Dày, Rộng và Dài.', [{ text: 'OK', action: closeModal }]);
+             return null;
         }
 
         const rộng = rộngCm / 100;
         const dài = dàiInputVal / 10;
+        const woodTypeName = woodTypeSelect.options[woodTypeSelect.selectedIndex].text;
         
-        const thểTích = rộng * dài * (dày / 1000);
-        const woodCost = Math.round(thểTích * giá);
+        let woodCost;
+        let priceInfo;
+
+        if (isManualMode) {
+            const manualPrice = parseFloat(manualPriceInput.value.replace(/\./g, ''));
+            if (isNaN(manualPrice)) {
+                showModal('Lỗi', 'Vui lòng nhập giá hàng tay hợp lệ.', [{ text: 'OK', action: closeModal }]);
+                return null;
+            }
+            // New Formula: dài (m) * giá hàng tay
+            woodCost = Math.round(dài * manualPrice);
+            priceInfo = `${formatNumber(manualPrice)} đ/m`; // Store for display
+        } else {
+            const giá = parseFloat(giáInput.value.replace(/\./g, ''));
+            if (isNaN(giá)) {
+                showModal('Lỗi', 'Vui lòng nhập giá (VND/m³) hợp lệ.', [{ text: 'OK', action: closeModal }]);
+                return null;
+            }
+            const thểTích = rộng * dài * (dày / 1000);
+            woodCost = Math.round(thểTích * giá);
+            priceInfo = `${formatNumber(giá)} đ/m³`; // Store for display
+        }
+
         const sandingOption = document.querySelector('input[name="sandingOption"]:checked').value;
         const sandingCostPerM2 = sandingPrices[sandingOption];
         const sandingCost = Math.round((rộng * dài) * sandingCostPerM2);
@@ -474,8 +521,8 @@
             rộng: rộng,
             dài: dài,
             dày: dày,
-            giá: giá,
-            thểTích: thểTích,
+            giá: isManualMode ? null : parseFloat(giáInput.value.replace(/\./g, '')),
+            manualPrice: isManualMode ? parseFloat(manualPriceInput.value.replace(/\./g, '')) : null,
             woodCost: woodCost,
             sandingCost: sandingCost,
             total: totalItemPrice,
@@ -565,11 +612,11 @@
     function updateSelectionState() {
         if(selectedIndices.size === 1) {
             addItemBtn.textContent = 'Chèn vào mục đã chọn';
-            addItemBtn.className = 'btn-primary w-full bg-green-600 hover:bg-green-700';
+            addItemBtn.className = 'btn-primary w-2/3 bg-green-600 hover:bg-green-700';
 
         } else {
             addItemBtn.textContent = 'Thêm vào hóa đơn';
-            addItemBtn.className = 'btn-primary w-full';
+            addItemBtn.className = 'btn-primary w-2/3';
         }
     }
 
@@ -614,6 +661,19 @@
                 runningWoodSubtotal += item.woodCost;
                 runningSandingSubtotal += item.sandingCost;
 
+                const prevItem = index > 0 ? invoiceItemsList[index - 1] : null;
+                let showWoodDetails = true;
+                if (prevItem && prevItem.type === 'item' && prevItem.woodName === item.woodName && prevItem.dày === item.dày && prevItem.giá === item.giá && prevItem.manualPrice === item.manualPrice) {
+                    showWoodDetails = false;
+                }
+                
+                let priceDisplay = '';
+                if (item.manualPrice != null) {
+                    priceDisplay = `${item.dày}mm - ${formatNumber(item.manualPrice)} đ/m`;
+                } else {
+                    priceDisplay = `${item.dày}mm - ${formatNumber(item.giá)} đ/m³`;
+                }
+
                 const row = document.createElement('tr');
                 row.className = 'selectable-row';
                 row.dataset.index = index; 
@@ -623,10 +683,10 @@
 
                 row.innerHTML = `
                     <td class="text-center px-4">${sttCounter++}</td>
-                    <td class="text-center px-4">${item.woodName}</td>
+                    <td class="text-center px-4">${showWoodDetails ? item.woodName : ''}</td>
                     <td class="text-center">${(item.rộng * 100).toFixed(0)}</td>
                     <td class="text-center">${(item.dài * 10).toFixed(0)}</td>
-                    <td class="text-center">${item.dày}mm - ${formatNumber(item.giá)} đ</td>
+                    <td class="text-center">${showWoodDetails ? priceDisplay : ''}</td>
                     <td class="text-center">${formatNumber(Math.round(item.sandingCost))} đ</td>
                     <td class="text-center">${formatNumber(Math.round(item.woodCost))} đ</td>
                     <td class="text-center no-print">
@@ -717,6 +777,9 @@
             return prevItem && prevItem.type === 'item';
         });
 
+        dàyInput.value = '';
+        giáInput.value = '';
+        manualPriceInput.value = '';
         selectedIndices.clear();
         lastClickedIndex = -1;
         updateInvoiceDisplay();
@@ -826,10 +889,10 @@
     }
     
     // --- SAVE / PRINT ---
-    function saveInvoice() {
+    function prepareInvoiceForOutput() {
         if (invoiceItemsList.length === 0) {
-            showModal('Lỗi', 'Hóa đơn trống. Vui lòng thêm sản phẩm trước khi lưu hoặc in.', [{ text: 'OK', action: closeModal }]);
-            return;
+            showModal('Lỗi', 'Hóa đơn trống. Vui lòng thêm sản phẩm trước.', [{ text: 'OK', action: closeModal }]);
+            return null;
         }
 
         customerNameDisplay.textContent = customerNameInput.value || ' ';
@@ -841,21 +904,104 @@
         invoiceMeta.textContent = `Số: ${String(invoiceNumber).padStart(3, '0')} - Ngày: ${formattedDate} - Giờ in: ${formattedTime}`;
         
         const customerNameForFile = (customerNameInput.value.trim() || 'KH_LE').replace(/[\/\\?%*:|"<>]/g, '-');
-        document.title = `${customerNameForFile}_${filenameDate}`;
+        return `${customerNameForFile}_${filenameDate}`;
+    }
 
-        window.print();
-        invoiceNumber++;
+    function printInvoice() {
+        const filename = prepareInvoiceForOutput();
+        if (filename) {
+            document.title = filename;
+            window.print();
+            invoiceNumber++;
+        }
+    }
+
+    function saveAsPdf() {
+        const filenameBase = prepareInvoiceForOutput();
+        if (filenameBase) {
+            const element = document.getElementById('invoice-content');
+            const opt = {
+              margin:       [0.5, 0.5, 0.5, 0.5], // top, left, bottom, right in cm
+              filename:     `${filenameBase}.pdf`,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true },
+              jsPDF:        { unit: 'cm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).save().then(() => {
+                 invoiceNumber++;
+            });
+        }
     }
 
 
+    // --- MANUAL MODE ---
+    function toggleManualMode() {
+        if (!isManualMode) { // Entering manual mode
+            if (!dàyInput.value || !rộngInput.value) {
+                showModal('Lỗi', 'Vui lòng nhập Dày và Rộng trước khi vào chế độ "Hàng tay".', [{ text: 'OK', action: closeModal }]);
+                return;
+            }
+        }
+
+        isManualMode = !isManualMode;
+        
+        woodTypeSelect.disabled = isManualMode;
+        dàyInput.disabled = isManualMode;
+        giáInput.disabled = isManualMode;
+        rộngInput.disabled = isManualMode;
+
+        
+        if (isManualMode) {
+            manualPriceWrapper.classList.remove('hidden');
+            manualModeBtn.textContent = 'Thoát';
+            manualModeBtn.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+            manualModeBtn.classList.add('bg-orange-500', 'hover:bg-orange-600');
+            dàiInput.focus();
+        } else {
+            manualPriceWrapper.classList.add('hidden');
+            manualModeBtn.textContent = 'Hàng tay';
+            manualModeBtn.classList.add('bg-teal-500', 'hover:bg-teal-600');
+            manualModeBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+        }
+    }
+
     // --- EVENT LISTENERS ---
     document.addEventListener('DOMContentLoaded', () => {
+        // Function to enforce numeric-only input (with optional decimal)
+        const enforceNumeric = (e) => {
+            if (
+                // Allow: backspace, delete, tab, escape, enter, home, end, left, right
+                [8, 46, 9, 27, 13, 35, 36, 37, 39].includes(e.keyCode) ||
+                // Allow: Ctrl+A/C/V/X
+                (e.keyCode == 65 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode == 67 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode == 86 && (e.ctrlKey === true || e.metaKey === true)) ||
+                (e.keyCode == 88 && (e.ctrlKey === true || e.metaKey === true)) ||
+                // Allow period/decimal point
+                (e.keyCode === 190 || e.keyCode === 110)
+            ) {
+                // let it happen
+                return;
+            }
+            // Ensure that it is a number and stop the keypress
+            if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                e.preventDefault();
+            }
+        };
+
+        dàyInput.addEventListener('keydown', enforceNumeric);
+        rộngInput.addEventListener('keydown', enforceNumeric);
+        dàiInput.addEventListener('keydown', enforceNumeric);
+        
         // Price input formatting
-        giáInput.addEventListener('input', (e) => {
+        const formatPriceInput = (e) => {
             let value = e.target.value;
             let cleanedValue = value.replace(/\D/g, '');
             e.target.value = formatNumber(cleanedValue);
-        });
+        };
+        giáInput.addEventListener('input', formatPriceInput);
+        manualPriceInput.addEventListener('input', formatPriceInput);
 
         // Enter key navigation
         dàyInput.addEventListener('keyup', (e) => {
@@ -870,13 +1016,29 @@
         dàiInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); addItem(); }
         });
+        manualPriceInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); dàiInput.focus(); }
+        });
+         dàiInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && dàiInput.value.length === 0) {
+                e.preventDefault();
+                rộngInput.focus();
+            }
+        });
 
         // Rapid entry listeners
         rộngInput.addEventListener('input', (e) => {
-            if (e.target.value.length >= 2) dàiInput.focus();
+             if (e.target.value.length > 2) {
+                e.target.value = e.target.value.slice(0, 2);
+             }
+             if (e.target.value.length >= 2 && !isManualMode) {
+                dàiInput.focus();
+             }
         });
-         dàiInput.addEventListener('input', (e) => {
-            if (e.target.value.length >= 2) addItem();
+        dàiInput.addEventListener('input', (e) => {
+            if (e.target.value.length > 2) {
+                e.target.value = e.target.value.slice(0, 2);
+            }
         });
 
         // Wood type selection change
@@ -899,19 +1061,24 @@
         });
 
         invoiceItems.addEventListener('mousedown', (e) => {
-             // If the mousedown is on a button, let its own click handler fire. Do not start selection.
-             if (e.target.closest('button')) {
-                 return;
-             }
+             if (e.target.closest('button')) return;
              const row = e.target.closest('tr.selectable-row');
              if (!row) return;
              isDragging = true;
              handleSelection(e);
         });
+
         document.addEventListener('mousemove', (e) => {
-            if(isDragging) handleSelection(e);
+            if(isDragging) {
+                handleSelection(e);
+                handleAutoScroll(e);
+            }
         });
-        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mouseup', () => {
+             isDragging = false;
+             clearInterval(autoScrollInterval);
+             autoScrollInterval = null;
+        });
 
         // Sanding shortcuts
         document.addEventListener('keydown', (e) => {
@@ -985,6 +1152,25 @@
                 }
             }
             updateInvoiceDisplay();
+        }
+    }
+
+    function handleAutoScroll(e) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+
+        const rect = invoiceScrollDiv.getBoundingClientRect();
+        const mouseY = e.clientY;
+        const scrollThreshold = 50; // pixels from edge
+
+        if (mouseY < rect.top + scrollThreshold) {
+            autoScrollInterval = setInterval(() => {
+                invoiceScrollDiv.scrollTop -= 10;
+            }, 20);
+        } else if (mouseY > rect.bottom - scrollThreshold) {
+            autoScrollInterval = setInterval(() => {
+                invoiceScrollDiv.scrollTop += 10;
+            }, 20);
         }
     }
 </script>
