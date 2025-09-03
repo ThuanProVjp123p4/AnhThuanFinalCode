@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phần mềm tính tiền gỗ</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3e%3cpath fill='%238d6e63' d='M19 12h-2V8h2v4M5 12V8h2v4H5M3 14h18v-2h-2v-4c0-1.11-.89-2-2-2h-2V3h-2v3h-4V3H9v3H7c-1.11 0-2 .89-2 2v4H3v2m2 4h14v-2H5v2Z'/%3e%3c/svg%3e">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
@@ -219,11 +220,11 @@
                 <label for="woodType" class="block text-sm font-medium text-gray-700">Loại gỗ</label>
                 <div class="flex items-center gap-2 mt-1">
                     <select id="woodType" class="input-field">
-                        <option value="soi">Sồi đỏ</option>
-                        <option value="lim">Thông</option>
-                        <option value="thong">Thông biến tính</option>
-                        <option value="ash">Ash</option>
-                        <option value="xoan">Xoan đào</option>
+                        <option value="soi">Gỗ Sồi</option>
+                        <option value="lim">Gỗ Lim</option>
+                        <option value="thong">Gỗ Thông</option>
+                        <option value="ash">Gỗ Ash</option>
+                        <option value="xoan">Gần Xoan</option>
                         <option value="add_new">Thêm loại gỗ mới</option>
                     </select>
                     <button onclick="deleteSelectedWood()" class="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">Xóa</button>
@@ -328,6 +329,7 @@
             </div>
 
             <div class="mt-8 text-left">
+                <p class="font-semibold mb-2">Người bán</p>
                 <div class="h-20 w-40 inline-block"></div>
             </div>
 
@@ -948,8 +950,8 @@
             return null;
         }
 
-        customerNameDisplay.textContent = customerNameInput.value || ' ';
-        customerPhoneDisplay.textContent = customerPhoneInput.value || ' ';
+        customerNameDisplay.textContent = customerNameInput.value || '-----------';
+        customerPhoneDisplay.textContent = customerPhoneInput.value || '-----------';
         const date = new Date();
         const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -1041,6 +1043,10 @@
     function cancelMove() {
         isMoveMode = false;
         document.body.classList.remove('is-moving-items');
+        if (movePlaceholder) {
+            movePlaceholder.remove();
+            movePlaceholder = null;
+        }
         moveBtn.textContent = 'Di chuyển';
         moveBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
         moveBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
@@ -1150,10 +1156,7 @@
             handleMouseUp(e);
         });
         invoiceItems.addEventListener('mouseleave', (e) => {
-            if(isMoveMode && movePlaceholder) {
-                movePlaceholder.remove();
-                movePlaceholder = null;
-            }
+            // Placeholder logic removed
         });
 
         // Sanding shortcuts
