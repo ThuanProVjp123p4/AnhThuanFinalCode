@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phần mềm tính tiền gỗ</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3e%3cpath fill='%238d6e63' d='M19 12h-2V8h2v4M5 12V8h2v4H5M3 14h18v-2h-2v-4c0-1.11-.89-2-2-2h-2V3h-2v3h-4V3H9v3H7c-1.11 0-2 .89-2 2v4H3v2m2 4h14v-2H5v2Z'/%3e%3c/svg%3e">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" xintegrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
@@ -328,6 +329,7 @@
             </div>
 
             <div class="mt-8 text-left">
+                <p class="font-semibold mb-2">Người bán</p>
                 <div class="h-20 w-40 inline-block"></div>
             </div>
 
@@ -482,9 +484,9 @@
 
     // --- MAIN LOGIC ---
     function createNewItem() {
-        const rộngCm = parseFloat(rộngInput.value);
-        const dàiInputVal = parseFloat(dàiInput.value);
-        const dày = parseFloat(dàyInput.value);
+        const rộngCm = parseFloat(rộngInput.value.replace(',', '.'));
+        const dàiInputVal = parseFloat(dàiInput.value.replace(',', '.'));
+        const dày = parseFloat(dàyInput.value.replace(',', '.'));
 
         if (isNaN(rộngCm) || isNaN(dàiInputVal) || isNaN(dày)) {
              showModal('Lỗi', 'Vui lòng nhập Dày, Rộng và Dài.', [{ text: 'OK', action: closeModal }]);
@@ -633,7 +635,7 @@
             return;
         }
 
-        const newDay = parseFloat(dàyInput.value);
+        const newDay = parseFloat(dàyInput.value.replace(',', '.'));
         const newGia = parseFloat(giáInput.value.replace(/\./g, ''));
 
         if (isNaN(newDay) || isNaN(newGia)) {
@@ -1041,6 +1043,10 @@
     function cancelMove() {
         isMoveMode = false;
         document.body.classList.remove('is-moving-items');
+        if (movePlaceholder) {
+            movePlaceholder.remove();
+            movePlaceholder = null;
+        }
         moveBtn.textContent = 'Di chuyển';
         moveBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
         moveBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
@@ -1051,8 +1057,8 @@
         // Function to enforce numeric-only input (with optional decimal)
         const enforceNumeric = (e) => {
             if (
-                // Allow: backspace, delete, tab, escape, enter, home, end, left, right
-                [8, 46, 9, 27, 13, 35, 36, 37, 39].includes(e.keyCode) ||
+                // Allow: backspace, delete, tab, escape, enter, home, end, left, right, comma
+                [8, 46, 9, 27, 13, 35, 36, 37, 39, 188].includes(e.keyCode) ||
                 // Allow: Ctrl+A/C/V/X
                 (e.keyCode == 65 && (e.ctrlKey === true || e.metaKey === true)) ||
                 (e.keyCode == 67 && (e.ctrlKey === true || e.metaKey === true)) ||
@@ -1107,19 +1113,40 @@
         });
 
         // Rapid entry listeners
-        rộngInput.addEventListener('input', (e) => {
-             if (e.target.value.length > 2) {
-                e.target.value = e.target.value.slice(0, 2);
-             }
-             if (e.target.value.length >= 2 && !isManualMode) {
-                dàiInput.focus();
-             }
-        });
-        dàiInput.addEventListener('input', (e) => {
-            if (e.target.value.length > 2) {
-                e.target.value = e.target.value.slice(0, 2);
+        const handleDimensionInput = (event, nextInput) => {
+            const input = event.target;
+            let value = input.value;
+
+            // Allow only one comma
+            const commaCount = (value.match(/,/g) || []).length;
+            if (commaCount > 1) {
+                value = value.substring(0, value.lastIndexOf(','));
             }
-        });
+
+            // Enforce length constraints
+            if (value.includes(',')) {
+                if (value.length > 3) { // e.g., 6,5 is 3 chars
+                    value = value.slice(0, 3);
+                }
+            } else {
+                if (value.length > 2) { // e.g., 15 is 2 chars
+                    value = value.slice(0, 2);
+                }
+            }
+            input.value = value;
+
+            // Auto-advance for rộngInput
+            if (nextInput && !isManualMode) {
+                const hasComma = value.includes(',');
+                if ((!hasComma && value.length >= 2) || (hasComma && value.length === 3)) {
+                    nextInput.focus();
+                }
+            }
+        };
+
+        rộngInput.addEventListener('input', (e) => handleDimensionInput(e, dàiInput));
+        dàiInput.addEventListener('input', (e) => handleDimensionInput(e, null));
+
 
         // Wood type selection change
         woodTypeSelect.addEventListener('change', () => {
@@ -1150,10 +1177,10 @@
             handleMouseUp(e);
         });
         invoiceItems.addEventListener('mouseleave', (e) => {
-            if(isMoveMode && movePlaceholder) {
+             if (movePlaceholder) {
                 movePlaceholder.remove();
                 movePlaceholder = null;
-            }
+             }
         });
 
         // Sanding shortcuts
@@ -1248,7 +1275,7 @@
 
     function handleMouseMove(e) {
         if (isMoveMode) {
-            // Placeholder logic removed as per user request
+            showMovePlaceholder(e);
         } else if (isMouseDown) {
             handleSelection(e);
             handleAutoScroll(e);
@@ -1307,6 +1334,36 @@
             updateInvoiceDisplay();
         }
     }
+
+    function showMovePlaceholder(e) {
+        if (!movePlaceholder) {
+            movePlaceholder = document.createElement('tr');
+            movePlaceholder.className = 'move-placeholder';
+            movePlaceholder.innerHTML = `<td colspan="8"></td>`;
+        }
+        
+        const afterElement = getElementToDropBefore(invoiceItems, e.clientY);
+        if (afterElement == null) {
+            invoiceItems.appendChild(movePlaceholder);
+        } else {
+            invoiceItems.insertBefore(movePlaceholder, afterElement);
+        }
+    }
+
+    function getElementToDropBefore(container, y) {
+        const rows = [...container.querySelectorAll('tr.selectable-row')];
+
+        return rows.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
 
     function handleAutoScroll(e) {
         clearInterval(autoScrollInterval);
